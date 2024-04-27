@@ -32,5 +32,5 @@ function e2p_email_to_post_deactivate()
   wp_clear_scheduled_hook('e2p_email_to_post_process_emails');
 }
 
-// // Schedule daily email processing task
-// add_action('e2p_email_to_post_process_emails', 'e2p_email_to_post_process_emails');
+// Schedule daily email processing task
+add_action('e2p_email_to_post_process_emails', 'e2p_new_email_check');
