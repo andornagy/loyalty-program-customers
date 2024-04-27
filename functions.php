@@ -262,4 +262,4 @@ function e2p_schedule_csv_processing()
     wp_schedule_event(time(), 'every_five_minutes', 'e2p_process_csv_batch');
   }
 }
-add_action('e2p_process_csv_batch', 'e2p_process_csv_in_batches');
+add_action('e2p_process_csv_batch', 'e2p_add_customer');
