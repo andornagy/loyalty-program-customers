@@ -25,8 +25,9 @@ function e2p_options_page_content()
       <?php submit_button('Save Settings'); ?>
     </form>
     <h3>Debug</h3>
+    <?php echo 'Process running: ' . get_option('e2p_csv_process_running', false) . '<br/>'; ?>
     <?php echo 'Processed lines: ' . get_option('e2p_csv_process_offset') . '<br/>'; ?>
-    <?php echo 'name of the last attachment file: ' . get_option('e2p_last_attachment') . '<br/>'; ?>
+    <?php echo 'Last attachment file: ' . get_option('e2p_last_attachment') . '<br/>'; ?>
   </div>
 <?php
 }
@@ -50,7 +51,7 @@ function e2p_register_settings()
   // General settings section
   register_setting('e2p_general_settings_group', 'e2p_batch');
 
-  add_settings_field('e2p_batch', 'Batch', 'e2p_batch_callback', 'e2p-settings', 'e2p_general_settings_section');
+  add_settings_field('e2p_batch', 'Batch size', 'e2p_batch_callback', 'e2p-settings', 'e2p_general_settings_section');
 
   add_settings_section('e2p_general_settings_section', 'General Settings', 'e2p_general_settings_section_callback', 'e2p-settings');
 }
@@ -91,5 +92,5 @@ function e2p_batch_callback()
 {
   $batch = get_option('e2p_batch');
   echo "<input type='text' name='e2p_batch' value='$batch' />";
-  echo "<p class='description' id='batch-description'>500</p>";
+  echo "<p class='description' id='batch-description'>Example: 500</p>";
 }

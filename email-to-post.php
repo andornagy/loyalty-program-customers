@@ -4,7 +4,7 @@
  * Plugin Name: Email to Customers
  * Plugin URI: https://andornagy.com
  * Description: Add new customers to the DB sent by email
- * Version: 0.0.1
+ * Version: 0.1.0
  * Author: Andor Nagy
  * Author URI: https://andornagy.com
  */

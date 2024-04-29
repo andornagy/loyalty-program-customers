@@ -18,6 +18,7 @@ function e2p_new_email_check()
 
   // If an attachment was found, start processing
   if ($attachment) {
+    update_option('e2p_csv_process_running', true);
     e2p_add_customer($attachment);
   }
 }
@@ -146,9 +147,20 @@ function e2p_close_connection($inbox)
   return imap_close($inbox);
 }
 
+function e2p_get_local_file_content($file_path)
+{
+  ob_start();
+  include $file_path;
+  $contents = ob_get_clean();
+
+  return $contents;
+}
+
 // Function to add customer data from CSV file
 function e2p_add_customer($new_attachment = null)
 {
+  if (!get_option('e2p_csv_process_running')) return;
+
   $attachment = $new_attachment ? $new_attachment : get_option('e2p_last_attachment');
 
   // If an attachment was found, add customer data
@@ -221,23 +233,14 @@ function e2p_add_customer($new_attachment = null)
   }
 
   update_option('e2p_csv_process_offset', $offset + $batch_size);
-  // If end of file reached, reset offset and remove scheduled event 
 
+  // If end of file reached, reset offset and remove scheduled event 
   if ($offset + $batch_size >= count($lines)) {
     update_option('e2p_csv_process_offset', 0);
     $timestamp = wp_next_scheduled('e2p_process_csv_batch');
     wp_unschedule_event($timestamp, 'e2p_process_csv_batch');
+    update_option('e2p_csv_process_running', false);
   }
-}
-
-
-function e2p_get_local_file_content($file_path)
-{
-  ob_start();
-  include $file_path;
-  $contents = ob_get_clean();
-
-  return $contents;
 }
 
 // Add custom interval to WP Cron
