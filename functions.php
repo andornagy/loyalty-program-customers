@@ -1,75 +1,87 @@
 <?php
 
 // Main function to process emails and create/update posts
-function e2p_new_email_check()
+function jldrp_new_email_check()
 {
   // Connect to the email inbox
-  $inbox = e2p_connect_to_inbox();
+  $inbox = jldrp_connect_to_inbox();
 
   // Check for new emails
-  $emails = e2p_get_new_emails($inbox);
+  $emails = jldrp_get_new_emails($inbox);
   if (is_wp_error($emails)) return;
 
   // Process emails and extract attachments
-  $attachment = e2p_process_emails($emails, $inbox);
+  $attachment = jldrp_process_latest_email($emails, $inbox);
 
   // Close the connection to the inbox
-  e2p_close_connection($inbox);
+  jldrp_close_connection($inbox);
 
   // If an attachment was found, start processing
   if ($attachment) {
-    update_option('e2p_csv_process_running', true);
-    e2p_add_customer($attachment);
+    update_option('jldrp_csv_process_running', 'true');
+    jldrp_add_customer($attachment);
   }
 }
 
 
 // Function to connect to the email inbox
-function e2p_connect_to_inbox()
+function jldrp_connect_to_inbox()
 {
-  $hostname = '{' . get_option('e2p_hostname') . '/imap/ssl}INBOX';
-  $username = get_option('e2p_username');
-  $password = get_option('e2p_password');
-  return imap_open($hostname, $username, $password);
+  $hostname = '{' . get_option('jldrp_hostname') . '/imap/ssl}INBOX';
+  $username = get_option('jldrp_username');
+  $password = get_option('jldrp_password');
+
+  $connect = imap_open($hostname, $username, $password);
+
+  if (!$connect) {
+    update_option('jldrp_csv_inbox_connection', 'Unsuccessful');
+  } else {
+    update_option('jldrp_csv_inbox_connection', 'Successful');
+    return imap_open($hostname, $username, $password);
+  }
 }
 
 // Function to retrieve new emails
-function e2p_get_new_emails($inbox)
+function jldrp_get_new_emails($inbox)
 {
   return imap_search($inbox, 'UNSEEN');
 }
 
-// Function to process emails and extract attachments
-function e2p_process_emails($emails, $inbox)
+/**
+ * Process the latest email and extract attachments.
+ *
+ * @param array $emails An array of email numbers to process.
+ * @param IMAP\Connection $inbox An IMAP stream resource representing the mailbox.
+ * @return bool|int Returns false if no emails are provided or the processing fails, otherwise returns the number of downloaded attachments.
+ */
+function jldrp_process_latest_email($emails, $inbox)
 {
-  if (!$emails) {
+  // If no emails provided, return false
+  if (empty($emails)) {
     return false;
   }
 
-  // Limit the number of emails to process
-  $maxEmails = 1;
+  // Sort emails with newest on top
+  rsort($emails);
 
-  rsort($emails); // Sort emails with newest on top
+  // Get the latest email number
+  $latestEmailNumber = reset($emails);
 
-  foreach ($emails as $emailNumber) {
+  // Fetch email structure
+  $structure = imap_fetchstructure($inbox, $latestEmailNumber);
 
-    $structure = imap_fetchstructure($inbox, $emailNumber);
-    $attachments = e2p_extract_attachments($structure, $inbox, $emailNumber);
+  // Extract attachments from the latest email
+  $attachments = jldrp_extract_attachments($structure, $inbox, $latestEmailNumber);
 
-    // Save attachments to disk
-    $downloaded = e2p_save_attachments($attachments, $emailNumber);
+  // Save attachments to disk
+  $downloaded = jldrp_save_attachments($attachments, $latestEmailNumber);
 
-    // Break loop if maximum number of emails processed
-    if (--$maxEmails <= 0) {
-      break;
-    }
-  }
-
+  // Return the number of downloaded attachments
   return $downloaded;
 }
 
 // Function to extract attachments from emails
-function e2p_extract_attachments($structure, $inbox, $emailNumber)
+function jldrp_extract_attachments($structure, $inbox, $emailNumber)
 {
   $attachments = array();
 
@@ -116,38 +128,38 @@ function e2p_extract_attachments($structure, $inbox, $emailNumber)
 }
 
 // Function to save attachments to disk
-function e2p_save_attachments($attachments, $emailNumber)
+function jldrp_save_attachments($attachments, $emailNumber)
 {
   if (!$attachments) {
     return false;
   }
 
   // Create directory if it doesn't exist
-  if (!file_exists(WP_CONTENT_DIR . '/e2p-attachments')) {
-    mkdir(WP_CONTENT_DIR . '/e2p-attachments', 0777, true);
+  if (!file_exists(WP_CONTENT_DIR . '/jldrp-attachments')) {
+    mkdir(WP_CONTENT_DIR . '/jldrp-attachments', 0777, true);
   }
 
   // Code to save attachments...
   foreach ($attachments as $attachment) {
     if ($attachment['is_attachment'] == 1) {
       $filename = $attachment['name'] ?: $attachment['filename'] ?: time() . ".dat";
-      $filePath = WP_CONTENT_DIR . '/e2p-attachments/' . $emailNumber . "-" . $filename;
+      $filePath = WP_CONTENT_DIR . '/jldrp-attachments/' . $emailNumber . "-" . $filename;
       file_put_contents($filePath, $attachment['attachment']);
     }
   }
 
-  update_option('e2p_last_attachment', $filePath);
+  update_option('jldrp_last_attachment', $filePath);
 
   return $filePath;
 }
 
 // Function to close the IMAP connection
-function e2p_close_connection($inbox)
+function jldrp_close_connection($inbox)
 {
   return imap_close($inbox);
 }
 
-function e2p_get_local_file_content($file_path)
+function jldrp_get_local_file_content($file_path)
 {
   ob_start();
   include $file_path;
@@ -157,20 +169,20 @@ function e2p_get_local_file_content($file_path)
 }
 
 // Function to add customer data from CSV file
-function e2p_add_customer($new_attachment = null)
+function jldrp_add_customer($new_attachment = null)
 {
-  if (!get_option('e2p_csv_process_running')) return;
+  if (!get_option('jldrp_csv_process_running')) return;
 
-  $attachment = $new_attachment ? $new_attachment : get_option('e2p_last_attachment');
+  $attachment = $new_attachment ? $new_attachment : get_option('jldrp_last_attachment');
 
   // If an attachment was found, add customer data
   if (is_wp_error($attachment)) return;
 
-  $batch_size = get_option('e2p_batch') ? get_option('e2p_batch') : 100; // Number of records to process at a time
+  $batch_size = get_option('jldrp_batch') ? get_option('jldrp_batch') : 100; // Number of records to process at a time
 
-  $offset = get_option('e2p_csv_process_offset', 0);
+  $offset = get_option('jldrp_csv_process_offset', 0);
 
-  $csv = e2p_get_local_file_content($attachment);
+  $csv = jldrp_get_local_file_content($attachment);
 
   if (is_wp_error($csv)) return;
 
@@ -232,21 +244,21 @@ function e2p_add_customer($new_attachment = null)
     }
   }
 
-  update_option('e2p_csv_process_offset', $offset + $batch_size);
+  update_option('jldrp_csv_process_offset', $offset + $batch_size);
 
   // If end of file reached, reset offset and remove scheduled event 
   if ($offset + $batch_size >= count($lines)) {
-    update_option('e2p_csv_process_offset', 0);
-    $timestamp = wp_next_scheduled('e2p_process_csv_batch');
-    wp_unschedule_event($timestamp, 'e2p_process_csv_batch');
-    update_option('e2p_csv_process_running', false);
+    update_option('jldrp_csv_process_offset', 0);
+    $timestamp = wp_next_scheduled('jldrp_process_csv_batch');
+    wp_unschedule_event($timestamp, 'jldrp_process_csv_batch');
+    update_option('jldrp_csv_process_running', 'false');
   }
 }
 
 // Add custom interval to WP Cron
-add_filter('cron_schedules', 'e2p_add_custom_cron_interval');
+add_filter('cron_schedules', 'jldrp_add_custom_cron_interval');
 
-function e2p_add_custom_cron_interval($schedules)
+function jldrp_add_custom_cron_interval($schedules)
 {
   $schedules['every_five_minutes'] = array(
     'interval' => 5 * 60, // 5 minutes in seconds
@@ -257,12 +269,12 @@ function e2p_add_custom_cron_interval($schedules)
 }
 
 // Schedule the event with the new custom interval
-add_action('wp', 'e2p_schedule_csv_processing');
+add_action('wp', 'jldrp_schedule_csv_processing');
 
-function e2p_schedule_csv_processing()
+function jldrp_schedule_csv_processing()
 {
-  if (!wp_next_scheduled('e2p_process_csv_batch')) {
-    wp_schedule_event(time(), 'every_five_minutes', 'e2p_process_csv_batch');
+  if (!wp_next_scheduled('jldrp_process_csv_batch')) {
+    wp_schedule_event(time(), 'every_five_minutes', 'jldrp_process_csv_batch');
   }
 }
-add_action('e2p_process_csv_batch', 'e2p_add_customer');
+add_action('jldrp_process_csv_batch', 'jldrp_add_customer');
