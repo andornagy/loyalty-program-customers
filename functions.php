@@ -34,9 +34,9 @@ function jldrp_connect_to_inbox()
   $connect = imap_open($hostname, $username, $password);
 
   if (!$connect) {
-    update_option('jldrp_csv_inbox_connection', 'Unsuccessful');
+    update_option('jldrp_inbox_connection_status', 'Unsuccessful');
   } else {
-    update_option('jldrp_csv_inbox_connection', 'Successful');
+    update_option('jldrp_inbox_connection_status', 'Successful');
     return imap_open($hostname, $username, $password);
   }
 }
@@ -47,13 +47,7 @@ function jldrp_get_new_emails($inbox)
   return imap_search($inbox, 'UNSEEN');
 }
 
-/**
- * Process the latest email and extract attachments.
- *
- * @param array $emails An array of email numbers to process.
- * @param IMAP\Connection $inbox An IMAP stream resource representing the mailbox.
- * @return bool|int Returns false if no emails are provided or the processing fails, otherwise returns the number of downloaded attachments.
- */
+// Process the latest email and extract attachments.
 function jldrp_process_latest_email($emails, $inbox)
 {
   // If no emails provided, return false
