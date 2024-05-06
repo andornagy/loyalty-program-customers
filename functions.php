@@ -27,14 +27,16 @@ function jldrp_new_email_check()
 // Function to connect to the email inbox
 function jldrp_connect_to_inbox()
 {
-  $hostname = '{' . get_option('jldrp_hostname') . '/imap/ssl}INBOX';
+  $hostname = '{' . get_option('jldrp_hostname') . ':993/imap/ssl/novalidate-cert}INBOX';
   $username = get_option('jldrp_username');
   $password = get_option('jldrp_password');
 
-  $connect = imap_open($hostname, $username, $password);
+  $connect = @imap_open($hostname, $username, $password);
 
   if (!$connect) {
-    update_option('jldrp_inbox_connection_status', 'Unsuccessful');
+    $errors = @imap_errors();
+    update_option('jldrp_inbox_connection_status', $errors);
+    echo 'Login failed: ' . implode('; ', $errors);
   } else {
     update_option('jldrp_inbox_connection_status', 'Successful');
     return imap_open($hostname, $username, $password);

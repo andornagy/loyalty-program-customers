@@ -61,7 +61,7 @@ function jldrp_hostname_callback()
 {
   $hostname = get_option('jldrp_hostname');
   echo "<input type='text' name='jldrp_hostname' value='$hostname' />";
-  echo "<p class='description' id='hostname-description'>Example: mail.domain.com:993</p>";
+  echo "<p class='description' id='hostname-description'>Example: mail.domain.com</p>";
 }
 
 function jldrp_username_callback()
