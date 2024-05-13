@@ -4,10 +4,14 @@ function jldrp_new_email_check()
 {
   // Connect to the email inbox
   $inbox = jldrp_connect_to_inbox();
+  if (!$inbox) return;
 
   // Check for new emails
   $emails = jldrp_get_new_emails($inbox);
-  if (is_wp_error($emails)) return;
+  if (!$emails) {
+    jldrp_close_connection($inbox); // Close connection if no emails found
+    return;
+  }
 
   // Process emails and extract attachments
   $attachment = jldrp_process_latest_email($emails, $inbox);
@@ -34,18 +38,27 @@ function jldrp_connect_to_inbox()
 
   if (!$connect) {
     $errors = @imap_errors();
-    update_option('jldrp_inbox_connection_status', 'Login failed: ' . implode('; ', $errors));
+    if ($errors) {
+      update_option('jldrp_inbox_connection_status', 'Login failed: ' . implode('; ', $errors));
+    }
     echo 'Login failed: ' . implode('; ', $errors);
   } else {
     update_option('jldrp_inbox_connection_status', 'Successfully connected');
-    return imap_open($hostname, $username, $password);
+    return @imap_open($hostname, $username, $password);
   }
 }
 
 // Function to retrieve new emails
 function jldrp_get_new_emails($inbox)
-{
-  return imap_search($inbox, 'UNSEEN');
+{ {
+    // Attempt to search for new emails
+    $emails = imap_search($inbox, 'UNSEEN');
+    if ($emails === false) {
+      echo 'Error searching for new emails: ' . imap_last_error();
+      return false; // Return false if search failed
+    }
+    return $emails; // Return array of email numbers if search successful
+  }
 }
 
 // Process the latest email and extract attachments.
@@ -179,7 +192,7 @@ function jldrp_add_customer($new_attachment = null)
   $attachment = $new_attachment ? $new_attachment : get_option('jldrp_last_attachment');
 
   // If an attachment was found, add customer data
-  if (is_wp_error($attachment)) return;
+  if (!$attachment) return;
 
   $batch_size = get_option('jldrp_batch') ? get_option('jldrp_batch') : 100; // Number of records to process at a time
 
@@ -187,7 +200,7 @@ function jldrp_add_customer($new_attachment = null)
 
   $csv = jldrp_get_local_file_content($attachment);
 
-  if (is_wp_error($csv)) return;
+  if (!$csv) return;
 
   $lines = explode("\n", $csv);
 

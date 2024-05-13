@@ -4,12 +4,10 @@
  * Plugin Name: Rewards Program
  * Plugin URI: https://jilllynndesign.com/
  * Description: Custom Funcationality for the Rewards Program
- * Version: 0.2.0
+ * Version: 0.2.1
  * Author: Andor Nagy
  * Author URI: https://andornagy.com/
  */
-
-require plugin_dir_path(__FILE__) . '/vendor/autoload.php';
 
 include(plugin_dir_path(__FILE__) . 'functions.php');
 include(plugin_dir_path(__FILE__) . 'options.php');
