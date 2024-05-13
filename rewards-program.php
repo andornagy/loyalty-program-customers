@@ -4,7 +4,7 @@
  * Plugin Name: Rewards Program
  * Plugin URI: https://jilllynndesign.com/
  * Description: Custom Funcationality for the Rewards Program
- * Version: 0.1.0
+ * Version: 0.2.0
  * Author: Andor Nagy
  * Author URI: https://andornagy.com/
  */
