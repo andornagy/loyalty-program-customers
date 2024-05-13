@@ -24,10 +24,11 @@ function jldrp_options_page_content()
       <?php submit_button('Save Settings'); ?>
     </form>
     <h3>Debug</h3>
-    <?php echo 'Connection to inbox: ' . get_option('jldrp_csv_inbox_connection', false) . '<br/>'; ?>
-    <?php echo 'Process running: ' . get_option('jldrp_csv_process_running', false) . '<br/>'; ?>
+    <?php echo 'Connection to inbox: ' . get_option('jldrp_inbox_connection_status', false) . '<br/>'; ?>
+    <?php echo 'Process running: ' . get_option('jldrp_csv_process_running') . '<br/>'; ?>
     <?php echo 'Processed lines: ' . get_option('jldrp_csv_process_offset') . '<br/>'; ?>
     <?php echo 'Last attachment file: ' . get_option('jldrp_last_attachment') . '<br/>'; ?>
+    <?php echo '<pre>' . print_r(get_option('jldrp_rows_processed')) . '</pre>' ?>
   </div>
 <?php
 }

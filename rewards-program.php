@@ -9,6 +9,7 @@
  * Author URI: https://andornagy.com/
  */
 
+require plugin_dir_path(__FILE__) . '/vendor/autoload.php';
 
 include(plugin_dir_path(__FILE__) . 'functions.php');
 include(plugin_dir_path(__FILE__) . 'options.php');
@@ -31,7 +32,21 @@ function jldrp_email_to_post_activate()
 function jldrp_email_to_post_deactivate()
 {
   wp_clear_scheduled_hook('jldrp_email_to_post_process_emails');
+  jldrp_remove_options_from_db();
 }
 
 // Schedule daily email processing task
 add_action('jldrp_email_to_post_process_emails', 'jldrp_new_email_check');
+
+
+function jldrp_remove_options_from_db()
+{
+  delete_option('jldrp_hostname');
+  delete_option('jldrp_username');
+  delete_option('jldrp_password');
+  delete_option('jldrp_batch');
+  delete_option('jldrp_csv_process_offset');
+  delete_option('jldrp_inbox_connection_status');
+  delete_option('jldrp_csv_process_running');
+  delete_option('jldrp_last_attachment');
+}

@@ -1,12 +1,14 @@
 {
-    "name": "andor/rewards-program",
-    "description": "Custom functionality for the Rewards Program",
-    "type": "project",
-    "authors": [
-        {
-            "name": "andornagym",
-            "email": "andornagy@outlook.com"
-        }
-    ],
-    "require": {}
+  "name": "andor/rewards-program",
+  "description": "Custom functionality for the Rewards Program",
+  "type": "project",
+  "authors": [
+    {
+      "name": "andornagym",
+      "email": "andornagy@outlook.com"
+    }
+  ],
+  "autoload": {
+    "psr-4": {}
+  }
 }

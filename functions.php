@@ -1,5 +1,4 @@
 <?php
-
 // Main function to process emails and create/update posts
 function jldrp_new_email_check()
 {
@@ -38,7 +37,7 @@ function jldrp_connect_to_inbox()
     update_option('jldrp_inbox_connection_status', $errors);
     echo 'Login failed: ' . implode('; ', $errors);
   } else {
-    update_option('jldrp_inbox_connection_status', 'Successful');
+    update_option('jldrp_inbox_connection_status', 'Successfully connected');
     return imap_open($hostname, $username, $password);
   }
 }
@@ -140,7 +139,15 @@ function jldrp_save_attachments($attachments, $emailNumber)
     if ($attachment['is_attachment'] == 1) {
       $filename = $attachment['name'] ?: $attachment['filename'] ?: time() . ".dat";
       $filePath = WP_CONTENT_DIR . '/jldrp-attachments/' . $emailNumber . "-" . $filename;
-      file_put_contents($filePath, $attachment['attachment']);
+
+      // Check file format (CSV)
+      $extension = pathinfo($filename, PATHINFO_EXTENSION);
+      if (strtolower($extension) === 'csv') {
+        // Process CSV attachment
+        file_put_contents($filePath, $attachment['attachment']);
+      } else {
+        echo "Skipping non-CSV attachment: $filename\n";
+      }
     }
   }
 
@@ -247,7 +254,7 @@ function jldrp_add_customer($new_attachment = null)
     update_option('jldrp_csv_process_offset', 0);
     $timestamp = wp_next_scheduled('jldrp_process_csv_batch');
     wp_unschedule_event($timestamp, 'jldrp_process_csv_batch');
-    update_option('jldrp_csv_process_running', 'false');
+    update_option('jldrp_csv_process_running', 'Last ran on: ' . time());
   }
 }
 
