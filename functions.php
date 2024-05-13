@@ -34,7 +34,7 @@ function jldrp_connect_to_inbox()
 
   if (!$connect) {
     $errors = @imap_errors();
-    update_option('jldrp_inbox_connection_status', $errors);
+    update_option('jldrp_inbox_connection_status', 'Login failed: ' . implode('; ', $errors));
     echo 'Login failed: ' . implode('; ', $errors);
   } else {
     update_option('jldrp_inbox_connection_status', 'Successfully connected');
