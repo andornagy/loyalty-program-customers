@@ -5,7 +5,7 @@
  * Plugin URI: https://jilllynndesign.com/
  * Description: Custom Funcationality for the Rewards Program
  * Version: 0.2.1
- * Author: Andor Nagy
+ * Author: Andor Nagy benxwqznrimchjll
  * Author URI: https://andornagy.com/
  */
 

@@ -31,10 +31,13 @@ function jldrp_new_email_check()
 function jldrp_connect_to_inbox()
 {
   $hostname = '{' . get_option('jldrp_hostname') . ':993/imap/ssl/novalidate-cert}INBOX';
+  // $hostname = '{' . get_option('jldrp_hostname') . ':995/pop3/ssl/novalidate-cert}INBOX';
   $username = get_option('jldrp_username');
   $password = get_option('jldrp_password');
 
   $connect = @imap_open($hostname, $username, $password);
+
+  var_dump($connect);
 
   if (!$connect) {
     $errors = @imap_errors();
