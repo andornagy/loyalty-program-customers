@@ -23,8 +23,6 @@ function jldrp_options_page_content()
   $connection = get_option('jldrp_inbox_connection_status', false);
   $offset = get_option('jldrp_csv_process_offset');
   $attachment = get_option('jldrp_last_attachment');
-  $updated = get_option('jldrp_csv_process_updated');
-  $added = get_option('jldrp_csv_process_added');
 
 
 ?>
@@ -54,10 +52,6 @@ function jldrp_options_page_content()
         <tr>
           <th scope="row"><label>Processed lines:</label></th>
           <td><?php echo $offset . ' '; ?></td>
-          <td><?php // echo 'updated ' . $updated . ' '; 
-              ?></td>
-          <td><?php // echo 'added ' . $added . ' '; 
-              ?></td>
         </tr>
         <tr>
           <th scope="row"><label>Last attachment file:</label></th>
