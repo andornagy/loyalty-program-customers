@@ -187,97 +187,113 @@ function jldrp_get_local_file_content(string $file_path)
 }
 
 // Function to add customer data from CSV file
-function jldrp_add_customer($new_attachment = null)
+function jldrp_add_customer($attachment = null)
 {
-  // if (!get_option('jldrp_csv_process_running')) return;
+  // Assuming the attachment is a CSV file
+  $file = fopen($attachment, 'r');
 
-  echo 'runs';
+  $addedCustomers = 0;
+  $updatedCustomers = 0;
 
-  $attachment = $new_attachment ? $new_attachment : get_option('jldrp_last_attachment');
+  // Step 1: Retrieve all existing customers' meta data once
+  $existing_customers = [];
+  $query = new WP_Query(array(
+    'post_type' => 'customers',
+    'posts_per_page' => -1,
+    'fields' => 'ids'
+  ));
 
-  // If an attachment was found, add customer data
-  if (!$attachment) return;
+  if ($query->have_posts()) {
+    foreach ($query->posts as $post_id) {
+      $customer_number = get_post_meta($post_id, 'customer_number', true);
+      $existing_customers[$customer_number] = array(
+        'post_id' => $post_id,
+        'name' => get_post_meta($post_id, 'customer_name', true),
+        'city' => get_post_meta($post_id, 'city', true),
+        'state' => get_post_meta($post_id, 'state', true),
+        'points' => get_post_meta($post_id, 'customer_points', true)
+      );
+    }
+  }
 
-  $csv = jldrp_get_local_file_content($attachment);
+  // Step 2: Process each line in the CSV
+  $new_customers = [];
+  $update_meta = [];
 
-  $lines = explode("\n", $csv);
+  while ($line = fgetcsv($file)) {
+    // Map CSV columns to variables
+    $customer_number = $line[0];
+    $name = $line[1];
+    $city = $line[2];
+    $state = $line[3];
+    $points = $line[4];
 
-  for ($i = 1; $i < count($lines); $i++) {
+    if (isset($existing_customers[$customer_number])) {
+      // Update existing customer data
+      $post_id = $existing_customers[$customer_number]['post_id'];
+      $updated = false;
 
-    $data = str_getcsv($lines[$i]);
+      if ($existing_customers[$customer_number]['name'] != $name) {
+        $update_meta[] = array('post_id' => $post_id, 'meta_key' => 'customer_name', 'meta_value' => sanitize_text_field($name));
+        $updated = true;
+      }
 
-    list($customer_number, $name, $city, $state, $points) = $data;
+      if ($existing_customers[$customer_number]['city'] != $city) {
+        $update_meta[] = array('post_id' => $post_id, 'meta_key' => 'city', 'meta_value' => sanitize_text_field($city));
+        $updated = true;
+      }
 
-    $customer_query = new WP_Query(array(
-      'post_type' => 'customers',
-      'meta_query' => array(
-        array(
-          'key' => 'customer_number',
-          'value' => $customer_number,
-          'compare' => '=',
-        )
-      )
-    ));
+      if ($existing_customers[$customer_number]['state'] != $state) {
+        $update_meta[] = array('post_id' => $post_id, 'meta_key' => 'state', 'meta_value' => sanitize_text_field($state));
+        $updated = true;
+      }
 
-    $updatedCustomers = 0;
-    $addedCustomers = 0;
+      if ($existing_customers[$customer_number]['points'] != $points) {
+        $update_meta[] = array('post_id' => $post_id, 'meta_key' => 'customer_points', 'meta_value' => $points);
+        $updated = true;
+      }
 
-    if ($customer_query->have_posts()) {
-      while ($customer_query->have_posts()) {
-        $customer_query->the_post();
-        $post_id = get_the_ID();
-
-        $existing_city = get_post_meta($post_id, 'city', true);
-        $existing_state = get_post_meta($post_id, 'state', true);
-        $existing_points = get_post_meta($post_id, 'customer_points', true);
-
-        $updated = false;
-
-        if ($existing_city != $city) {
-          update_post_meta($post_id, 'city', sanitize_text_field($city));
-          $updated = true;
-        }
-
-        if ($existing_state != $state) {
-          update_post_meta($post_id, 'state', sanitize_text_field($state));
-          $updated = true;
-        }
-
-        if ($existing_points != $points) {
-          update_post_meta($post_id, 'customer_points', $points);
-          $updated = true;
-        }
-
-        if ($updated) {
-          $updatedCustomers++;
-          $updated = false;
-        }
+      if ($updated) {
+        $updatedCustomers++;
       }
     } else {
-      $new_post_args = array(
-        'post_type' => 'customers',
+      // Collect new customer data for bulk insertion
+      $new_customers[] = array(
         'post_title' => sanitize_text_field($name),
-        'post_content' => '',
+        'post_type' => 'customers',
         'post_status' => 'publish',
-        'comment_status' => 'closed',
-        'ping_status' => 'closed',
+        'meta_input' => array(
+          'customer_number' => sanitize_text_field($customer_number),
+          'city' => sanitize_text_field($city),
+          'state' => sanitize_text_field($state),
+          'customer_points' => $points
+        )
       );
-      $new_post_id = wp_insert_post($new_post_args);
-
-      update_post_meta($new_post_id, 'customer_number', sanitize_text_field($customer_number));
-      update_post_meta($new_post_id, 'city', sanitize_text_field($city));
-      update_post_meta($new_post_id, 'state', sanitize_text_field($state));
-      update_post_meta($new_post_id, 'customer_points', $points);
-
       $addedCustomers++;
     }
   }
 
-  // If end of file reached, reset offset and remove scheduled event 
-  if ($i >= count($lines)) {
-    update_option('jldrp_csv_process_running', time());
-    update_option('jldrp_csv_process_offset', $i);
+  fclose($file);
+
+  // Step 3: Bulk insert new customers
+  foreach ($new_customers as $customer_data) {
+    wp_insert_post($customer_data);
   }
+
+  // Step 4: Bulk update existing customers
+  global $wpdb;
+  foreach ($update_meta as $meta) {
+    $wpdb->update(
+      $wpdb->postmeta,
+      array('meta_value' => $meta['meta_value']),
+      array('post_id' => $meta['post_id'], 'meta_key' => $meta['meta_key']),
+      array('%s'),
+      array('%d', '%s')
+    );
+  }
+
+  update_option('jldrp_csv_process_running', time());
+  update_option('jldrp_csv_process_offset', count(fgetcsv($file)));
 }
 
 // Add custom interval to WP Cron
