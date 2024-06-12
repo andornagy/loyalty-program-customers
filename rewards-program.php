@@ -4,8 +4,8 @@
  * Plugin Name: Rewards Program
  * Plugin URI: https://jilllynndesign.com/
  * Description: Custom Funcationality for the Rewards Program
- * Version: 0.2.1
- * Author: Andor Nagy benxwqznrimchjll
+ * Version: 0.3
+ * Author: Andor Nagy
  * Author URI: https://andornagy.com/
  */
 
@@ -42,7 +42,6 @@ function jldrp_remove_options_from_db()
   delete_option('jldrp_hostname');
   delete_option('jldrp_username');
   delete_option('jldrp_password');
-  delete_option('jldrp_batch');
   delete_option('jldrp_csv_process_offset');
   delete_option('jldrp_inbox_connection_status');
   delete_option('jldrp_csv_process_running');

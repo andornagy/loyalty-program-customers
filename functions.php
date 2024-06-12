@@ -21,7 +21,6 @@ function jldrp_new_email_check()
 
   // If an attachment was found, start processing
   if ($attachment) {
-    update_option('jldrp_csv_process_running', 'true');
     jldrp_add_customer($attachment);
   }
 }
@@ -178,7 +177,7 @@ function jldrp_close_connection($inbox)
   return imap_close($inbox);
 }
 
-function jldrp_get_local_file_content($file_path)
+function jldrp_get_local_file_content(string $file_path)
 {
   ob_start();
   include $file_path;
@@ -190,24 +189,20 @@ function jldrp_get_local_file_content($file_path)
 // Function to add customer data from CSV file
 function jldrp_add_customer($new_attachment = null)
 {
-  if (!get_option('jldrp_csv_process_running')) return;
+  // if (!get_option('jldrp_csv_process_running')) return;
+
+  echo 'runs';
 
   $attachment = $new_attachment ? $new_attachment : get_option('jldrp_last_attachment');
 
   // If an attachment was found, add customer data
   if (!$attachment) return;
 
-  $batch_size = get_option('jldrp_batch') ? get_option('jldrp_batch') : 100; // Number of records to process at a time
-
-  $offset = get_option('jldrp_csv_process_offset', 0);
-
   $csv = jldrp_get_local_file_content($attachment);
-
-  if (!$csv) return;
 
   $lines = explode("\n", $csv);
 
-  for ($i = $offset; $i < min($offset + $batch_size, count($lines)); $i++) {
+  for ($i = 1; $i < count($lines); $i++) {
 
     $data = str_getcsv($lines[$i]);
 
@@ -224,6 +219,9 @@ function jldrp_add_customer($new_attachment = null)
       )
     ));
 
+    $updatedCustomers = 0;
+    $addedCustomers = 0;
+
     if ($customer_query->have_posts()) {
       while ($customer_query->have_posts()) {
         $customer_query->the_post();
@@ -233,16 +231,26 @@ function jldrp_add_customer($new_attachment = null)
         $existing_state = get_post_meta($post_id, 'state', true);
         $existing_points = get_post_meta($post_id, 'customer_points', true);
 
+        $updated = false;
+
         if ($existing_city != $city) {
           update_post_meta($post_id, 'city', sanitize_text_field($city));
+          $updated = true;
         }
 
         if ($existing_state != $state) {
           update_post_meta($post_id, 'state', sanitize_text_field($state));
+          $updated = true;
         }
 
         if ($existing_points != $points) {
           update_post_meta($post_id, 'customer_points', $points);
+          $updated = true;
+        }
+
+        if ($updated) {
+          $updatedCustomers++;
+          $updated = false;
         }
       }
     } else {
@@ -260,40 +268,38 @@ function jldrp_add_customer($new_attachment = null)
       update_post_meta($new_post_id, 'city', sanitize_text_field($city));
       update_post_meta($new_post_id, 'state', sanitize_text_field($state));
       update_post_meta($new_post_id, 'customer_points', $points);
+
+      $addedCustomers++;
     }
   }
 
-  update_option('jldrp_csv_process_offset', $offset + $batch_size);
-
   // If end of file reached, reset offset and remove scheduled event 
-  if ($offset + $batch_size >= count($lines)) {
-    update_option('jldrp_csv_process_offset', 0);
-    $timestamp = wp_next_scheduled('jldrp_process_csv_batch');
-    wp_unschedule_event($timestamp, 'jldrp_process_csv_batch');
-    update_option('jldrp_csv_process_running', 'Last ran on: ' . time());
+  if ($i >= count($lines)) {
+    update_option('jldrp_csv_process_running', time());
+    update_option('jldrp_csv_process_offset', $i);
   }
 }
 
 // Add custom interval to WP Cron
-add_filter('cron_schedules', 'jldrp_add_custom_cron_interval');
+// add_filter('cron_schedules', 'jldrp_add_custom_cron_interval');
 
-function jldrp_add_custom_cron_interval($schedules)
-{
-  $schedules['every_five_minutes'] = array(
-    'interval' => 5 * 60, // 5 minutes in seconds
-    'display' => esc_html__('Every 5 minutes'),
-  );
+// function jldrp_add_custom_cron_interval($schedules)
+// {
+//   $schedules['every_five_minutes'] = array(
+//     'interval' => 5 * 60, // 5 minutes in seconds
+//     'display' => esc_html__('Every 5 minutes'),
+//   );
 
-  return $schedules;
-}
+//   return $schedules;
+// }
 
 // Schedule the event with the new custom interval
-add_action('wp', 'jldrp_schedule_csv_processing');
+// add_action('wp', 'jldrp_schedule_csv_processing');
 
-function jldrp_schedule_csv_processing()
-{
-  if (!wp_next_scheduled('jldrp_process_csv_batch')) {
-    wp_schedule_event(time(), 'every_five_minutes', 'jldrp_process_csv_batch');
-  }
-}
-add_action('jldrp_process_csv_batch', 'jldrp_add_customer');
+// function jldrp_schedule_csv_processing()
+// {
+//   if (!wp_next_scheduled('jldrp_process_csv_batch')) {
+//     wp_schedule_event(time(), 'every_five_minutes', 'jldrp_process_csv_batch');
+//   }
+// }
+// add_action('jldrp_process_csv_batch', 'jldrp_add_customer');
