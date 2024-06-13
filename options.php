@@ -21,7 +21,7 @@ function jldrp_options_page_content()
   $lastRan = wp_date($format, $status);
 
   $connection = get_option('jldrp_inbox_connection_status', false);
-  $offset = get_option('jldrp_csv_process_offset');
+  $data = get_option('jldrp_csv_process_data');
   $attachment = get_option('jldrp_last_attachment');
 
 
@@ -51,7 +51,7 @@ function jldrp_options_page_content()
         </tr>
         <tr>
           <th scope="row"><label>Processed lines:</label></th>
-          <td><?php echo $offset . ' '; ?></td>
+          <td><?php echo 'Total: ' . $data['total'] . ', Added: ' . $data['added'] . ', Updated: ' . $data['updated'] . ', Deleted: ' . $data['deleted']; ?></td>
         </tr>
         <tr>
           <th scope="row"><label>Last attachment file:</label></th>

@@ -30,13 +30,12 @@ function jldrp_new_email_check()
 function jldrp_connect_to_inbox()
 {
   $hostname = '{' . get_option('jldrp_hostname') . ':993/imap/ssl/novalidate-cert}INBOX';
-  // $hostname = '{' . get_option('jldrp_hostname') . ':995/pop3/ssl/novalidate-cert}INBOX';
   $username = get_option('jldrp_username');
   $password = get_option('jldrp_password');
 
   $connect = @imap_open($hostname, $username, $password);
 
-  var_dump($connect);
+  // var_dump($connect);
 
   if (!$connect) {
     $errors = @imap_errors();
@@ -48,6 +47,12 @@ function jldrp_connect_to_inbox()
     update_option('jldrp_inbox_connection_status', 'Successfully connected');
     return @imap_open($hostname, $username, $password);
   }
+}
+
+// Function to close the IMAP connection
+function jldrp_close_connection($inbox)
+{
+  return imap_close($inbox);
 }
 
 // Function to retrieve new emails
@@ -140,42 +145,45 @@ function jldrp_extract_attachments($structure, $inbox, $emailNumber)
 // Function to save attachments to disk
 function jldrp_save_attachments($attachments, $emailNumber)
 {
-  if (!$attachments) {
+  if (empty($attachments)) {
+    echo ('No attachments found.');
     return false;
   }
 
-  // Create directory if it doesn't exist
-  if (!file_exists(WP_CONTENT_DIR . '/jldrp-attachments')) {
-    mkdir(WP_CONTENT_DIR . '/jldrp-attachments', 0777, true);
+  $attachmentsDirectory = WP_CONTENT_DIR . '/jldrp-attachments';
+  if (!file_exists($attachmentsDirectory)) {
+    mkdir($attachmentsDirectory, 0777, true);
   }
 
-  // Code to save attachments...
+  $filePath = null;
   foreach ($attachments as $attachment) {
-    if ($attachment['is_attachment'] == 1) {
-      $filename = $attachment['name'] ?: $attachment['filename'] ?: time() . ".dat";
-      $filePath = WP_CONTENT_DIR . '/jldrp-attachments/' . $emailNumber . "-" . $filename;
-
-      // Check file format (CSV)
-      $extension = pathinfo($filename, PATHINFO_EXTENSION);
-      if (strtolower($extension) === 'csv') {
-        // Process CSV attachment
-        file_put_contents($filePath, $attachment['attachment']);
-      } else {
-        echo "Skipping non-CSV attachment: $filename\n";
-      }
+    if (!$attachment['is_attachment']) {
+      continue;
     }
+
+    $attachmentName = $attachment['name'] ?: $attachment['filename'];
+    echo ("Checking attachment: $attachmentName");
+    $isValidReport = strtolower($attachmentName) === 'loyaltyreport.csv'
+      && strtolower(pathinfo($attachmentName, PATHINFO_EXTENSION)) === 'csv';
+    if (!$isValidReport) {
+      continue;
+    }
+
+    $filePath = $attachmentsDirectory . '/' . $emailNumber . '-' . $attachmentName;
+    file_put_contents($filePath, $attachment['attachment']);
+    echo ("Saved attachment to: $filePath");
+    break;
   }
 
-  update_option('jldrp_last_attachment', $filePath);
+  if ($filePath) {
+    update_option('jldrp_last_attachment', $filePath);
+  } else {
+    error_log('No valid attachment found.');
+  }
 
   return $filePath;
 }
 
-// Function to close the IMAP connection
-function jldrp_close_connection($inbox)
-{
-  return imap_close($inbox);
-}
 
 function jldrp_get_local_file_content(string $file_path)
 {
@@ -186,16 +194,10 @@ function jldrp_get_local_file_content(string $file_path)
   return $contents;
 }
 
-// Function to add customer data from CSV file
-function jldrp_add_customer($attachment = null)
+// Function to retrieve all existing customers
+// Function to retrieve all existing customers
+function get_existing_customers()
 {
-  // Assuming the attachment is a CSV file
-  $file = fopen($attachment, 'r');
-
-  $addedCustomers = 0;
-  $updatedCustomers = 0;
-
-  // Step 1: Retrieve all existing customers' meta data once
   $existing_customers = [];
   $query = new WP_Query(array(
     'post_type' => 'customers',
@@ -216,11 +218,31 @@ function jldrp_add_customer($attachment = null)
     }
   }
 
-  // Step 2: Process each line in the CSV
+  echo "Retrieved " . count($existing_customers) . " existing customers.\n";
+  return $existing_customers;
+}
+
+// Function to process CSV file and determine actions
+function process_csv_file($file, $existing_customers)
+{
+  $addedCustomers = 0;
+  $updatedCustomers = 0;
+  $totalCustomers = 0;
   $new_customers = [];
   $update_meta = [];
 
-  while ($line = fgetcsv($file)) {
+  while (!feof($file)) {
+    $line = fgetcsv($file);
+
+    // Skip lines where the first column isn't a number
+    if (!is_numeric($line[0])) {
+      echo "Skipping line with non-numeric customer number: " . implode(", ", $line) . "\n";
+      continue;
+    }
+
+    // Increment total customers count
+    $totalCustomers++;
+
     // Map CSV columns to variables
     $customer_number = $line[0];
     $name = $line[1];
@@ -256,6 +278,8 @@ function jldrp_add_customer($attachment = null)
       if ($updated) {
         $updatedCustomers++;
       }
+
+      unset($existing_customers[$customer_number]);
     } else {
       // Collect new customer data for bulk insertion
       $new_customers[] = array(
@@ -273,14 +297,22 @@ function jldrp_add_customer($attachment = null)
     }
   }
 
-  fclose($file);
+  echo "Processed CSV file. Total customers: $totalCustomers, New customers: $addedCustomers, Updated customers: $updatedCustomers.\n";
+  return [$new_customers, $update_meta, $addedCustomers, $updatedCustomers, $existing_customers, $totalCustomers];
+}
 
-  // Step 3: Bulk insert new customers
+// Function to add new customers
+function add_new_customers($new_customers)
+{
   foreach ($new_customers as $customer_data) {
     wp_insert_post($customer_data);
   }
+  echo "Added " . count($new_customers) . " new customers.\n";
+}
 
-  // Step 4: Bulk update existing customers
+// Function to update existing customers
+function update_existing_customers($update_meta)
+{
   global $wpdb;
   foreach ($update_meta as $meta) {
     $wpdb->update(
@@ -291,31 +323,56 @@ function jldrp_add_customer($attachment = null)
       array('%d', '%s')
     );
   }
-
-  update_option('jldrp_csv_process_running', time());
-  update_option('jldrp_csv_process_offset', count(fgetcsv($file)));
+  echo "Updated " . count($update_meta) . " customer records.\n";
 }
 
-// Add custom interval to WP Cron
-// add_filter('cron_schedules', 'jldrp_add_custom_cron_interval');
+// Function to delete customers not in the CSV
+function delete_customers_not_in_csv($existing_customers)
+{
+  $deletedCustomers = 0;
+  foreach ($existing_customers as $customer) {
+    wp_delete_post($customer['post_id'], true);
+    $deletedCustomers++;
+  }
+  echo "Deleted $deletedCustomers customers not found in CSV.\n";
+  return $deletedCustomers;
+}
 
-// function jldrp_add_custom_cron_interval($schedules)
-// {
-//   $schedules['every_five_minutes'] = array(
-//     'interval' => 5 * 60, // 5 minutes in seconds
-//     'display' => esc_html__('Every 5 minutes'),
-//   );
+// Main function to add customer data from CSV file
+function jldrp_add_customer($attachment = null)
+{
+  $file = fopen($attachment, 'r');
+  if (!$file) {
+    echo "Failed to open file: $attachment\n";
+    return;
+  }
 
-//   return $schedules;
-// }
+  $existing_customers = get_existing_customers();
 
-// Schedule the event with the new custom interval
-// add_action('wp', 'jldrp_schedule_csv_processing');
+  list($new_customers, $update_meta, $addedCustomers, $updatedCustomers, $remaining_customers, $totalCustomers) = process_csv_file($file, $existing_customers);
+  fclose($file);
 
-// function jldrp_schedule_csv_processing()
-// {
-//   if (!wp_next_scheduled('jldrp_process_csv_batch')) {
-//     wp_schedule_event(time(), 'every_five_minutes', 'jldrp_process_csv_batch');
-//   }
-// }
-// add_action('jldrp_process_csv_batch', 'jldrp_add_customer');
+  add_new_customers($new_customers);
+  update_existing_customers($update_meta);
+  $deletedCustomers = delete_customers_not_in_csv($remaining_customers);
+
+  $customerData = [
+    'total' => $totalCustomers,
+    'added' => $addedCustomers,
+    'updated' => $updatedCustomers,
+    'deleted' => $deletedCustomers
+  ];
+
+  update_option('jldrp_csv_process_running', time());
+  update_option('jldrp_csv_process_data', $customerData);
+
+  echo "CSV processing complete. Total customers in CSV: $totalCustomers, Added: $addedCustomers, Updated: $updatedCustomers, Deleted: $deletedCustomers.\n";
+
+  // Optionally, return the counts for further processing or logging
+  return [
+    'total' => $totalCustomers,
+    'added' => $addedCustomers,
+    'updated' => $updatedCustomers,
+    'deleted' => $deletedCustomers
+  ];
+}
