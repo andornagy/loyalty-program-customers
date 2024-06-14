@@ -231,12 +231,10 @@ function process_csv_file($file, $existing_customers)
   $new_customers = [];
   $update_meta = [];
 
-  while (!feof($file)) {
-    $line = fgetcsv($file);
-
+  $line_number = 0;
+  while (($line = fgetcsv($file)) !== false && $line_number++ < 100) {
     // Skip lines where the first column isn't a number
     if (!is_numeric($line[0])) {
-      echo "Skipping line with non-numeric customer number: " . implode(", ", $line) . "\n";
       continue;
     }
 
@@ -248,7 +246,7 @@ function process_csv_file($file, $existing_customers)
     $name = $line[1];
     $city = $line[2];
     $state = $line[3];
-    $points = $line[4];
+    $points = floatval($line[4]);
 
     if (isset($existing_customers[$customer_number])) {
       // Update existing customer data

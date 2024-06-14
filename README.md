@@ -1,5 +1,10 @@
 # loyalty-program-customers
 
+# 0.3.2
+
+- Fixed a bug where customer points were added as string into a number field.
+- Fixed a bug that let while loop `process_csv_file` function run more times then there were lines in the CSV file.
+
 # 0.3.1
 
 - Added check for SCV file
