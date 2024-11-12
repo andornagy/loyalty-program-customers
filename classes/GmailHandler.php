@@ -17,16 +17,48 @@ class GmailHandler
         $this->client = new Client();
         $this->client->setAuthConfig(__DIR__ . '/../credentials.json');
         $this->client->setRedirectUri(admin_url('admin-post.php?action=gmail_authenticate'));
-        $this->client->setScopes(Gmail::GMAIL_READONLY);
+        $this->client->setScopes([Gmail::GMAIL_READONLY]);
         $this->client->setAccessType('offline');
         $this->client->setPrompt('consent');
 
-        $accessToken = json_decode(get_option('gmail_access_token'), true);
-        $this->client->setAccessToken($accessToken);
+        // Retrieve and decode access token
+        $accessToken = get_option('gmail_access_token');
+        $decodedToken = $accessToken ? json_decode($accessToken, true) : null;
 
+        // Log access token retrieval
+        error_log("Access token retrieved: " . print_r($decodedToken, true));
+
+        // Check if we have a valid access token
+        if ($decodedToken && isset($decodedToken['access_token'])) {
+            $this->client->setAccessToken($decodedToken);
+        } else {
+            error_log("No valid access token found. Redirecting to authenticate.");
+            $this->request_new_token();
+            return; // Prevent further execution if no token is available
+        }
+
+        // Check if the token is expired
         if ($this->client->isAccessTokenExpired()) {
-            $this->client->fetchAccessTokenWithRefreshToken($this->client->getRefreshToken());
-            update_option('gmail_access_token', json_encode($this->client->getAccessToken()));
+            error_log("Access token expired, attempting to refresh.");
+
+            $refreshToken = $this->client->getRefreshToken();
+            if ($refreshToken) {
+                // Attempt to refresh the access token
+                $newToken = $this->client->fetchAccessTokenWithRefreshToken($refreshToken);
+                if (!isset($newToken['error'])) {
+                    // Update the access token
+                    update_option('gmail_access_token', json_encode(array_merge($decodedToken, $newToken)));
+                    error_log("Access token refreshed successfully.");
+                } else {
+                    error_log("Error refreshing token, re-authentication required: " . $newToken['error']);
+                    $this->request_new_token();
+                    return;
+                }
+            } else {
+                error_log("Refresh token missing, re-authentication required.");
+                $this->request_new_token();
+                return;
+            }
         }
 
         $this->service = new Gmail($this->client);
@@ -45,10 +77,43 @@ class GmailHandler
             exit();
         } else {
             $token = $this->client->fetchAccessTokenWithAuthCode($_GET['code']);
-            update_option('gmail_access_token', json_encode($token));
+
+            // Handle token errors
+            if (isset($token['error'])) {
+                error_log("Error in authentication token: " . $token['error']);
+                wp_die("Error fetching access token: " . esc_html($token['error']));
+            }
+
+            // Retrieve existing token if available to merge refresh token
+            $existingToken = json_decode(get_option('gmail_access_token'), true) ?: [];
+            if (isset($token['refresh_token'])) {
+                // Save the new refresh token
+                $existingToken['refresh_token'] = $token['refresh_token'];
+                error_log("New refresh token received and saved.");
+            }
+
+            // Save the merged token data to include refresh token if missing
+            update_option('gmail_access_token', json_encode(array_merge($existingToken, $token)));
             wp_redirect(admin_url('options-general.php?page=rewards-program'));
             exit();
         }
+    }
+
+    private function request_new_token()
+    {
+        // Set a transient to limit redirects to one time per 5 minutes
+        if (get_transient('gmail_auth_redirect')) {
+            error_log("Redirect already attempted recently, preventing loop.");
+            return;
+        }
+
+        // Set the transient to avoid further redirects
+        set_transient('gmail_auth_redirect', true, 300); // 5 minutes
+
+        $authUrl = $this->client->createAuthUrl();
+        error_log("Redirecting to Google authentication URL: $authUrl");
+        wp_redirect($authUrl);
+        exit();
     }
 
     /**
