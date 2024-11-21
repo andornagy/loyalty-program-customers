@@ -93,6 +93,13 @@ class CSVProcessor
         if (($handle = fopen($this->csvFilePath, 'r')) !== false) {
             while (($row = fgetcsv($handle)) !== false) {
                 if (count($row) === count($expectedKeys)) {
+
+                    // Check if the first column (customer_number) is numeric
+                    if (!is_numeric($row[0])) {
+                        error_log("Skipping row with non-numeric customer_number: " . print_r($row, true));
+                        continue;
+                    }
+
                     $data[] = array_combine($expectedKeys, $row);
                 } else {
                     error_log("CSV row does not match expected format: " . print_r($row, true));
@@ -117,7 +124,7 @@ class CSVProcessor
     {
         $existingCustomers = [];
         $query = new \WP_Query([
-            'post_type' => 'customer',
+            'post_type' => 'customers',
             'posts_per_page' => -1,
             'fields' => 'ids',
             'meta_query' => [
@@ -150,7 +157,7 @@ class CSVProcessor
     {
         $postId = wp_insert_post([
             'post_title' => $data['name'],
-            'post_type' => 'customer',
+            'post_type' => 'customers',
             'post_status' => 'publish'
         ]);
 

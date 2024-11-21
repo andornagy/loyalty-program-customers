@@ -17,7 +17,10 @@ class GmailHandler
         $this->client = new Client();
         $this->client->setAuthConfig(__DIR__ . '/../credentials.json');
         $this->client->setRedirectUri(admin_url('admin-post.php?action=gmail_authenticate'));
-        $this->client->setScopes([Gmail::GMAIL_READONLY]);
+        $this->client->setScopes([
+            Gmail::GMAIL_READONLY,
+            'https://www.googleapis.com/auth/userinfo.email', // Scope to access the user's email address
+        ]);
         $this->client->setAccessType('offline');
         $this->client->setPrompt('consent');
 
@@ -94,6 +97,17 @@ class GmailHandler
 
             // Save the merged token data to include refresh token if missing
             update_option('gmail_access_token', json_encode(array_merge($existingToken, $token)));
+
+            $gmailHandler = new GmailHandler();
+            $email = $gmailHandler->get_user_email();
+
+            if ($email) {
+                error_log("Logged-in user email: $email");
+                update_option('gmail_logged_in_email', $email);
+            } else {
+                error_log("Unable to retrieve the user's email address.");
+            }
+
             wp_redirect(admin_url('options-general.php?page=rewards-program'));
             exit();
         }
@@ -114,6 +128,15 @@ class GmailHandler
         error_log("Redirecting to Google authentication URL: $authUrl");
         wp_redirect($authUrl);
         exit();
+    }
+
+    public function get_user_email()
+    {
+        $profile = $this->service->users->getProfile('me');
+        if (isset($profile->emailAddress)) {
+            return $profile->emailAddress;
+        }
+        return null; // No email found
     }
 
     /**

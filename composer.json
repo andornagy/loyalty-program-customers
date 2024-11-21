@@ -1,5 +1,6 @@
 {
-    "require": {
-        "google/apiclient": "^2.18"
-    }
+	"optimize-autoloader": true,
+	"require": {
+		"google/apiclient": "^2.18"
+	}
 }

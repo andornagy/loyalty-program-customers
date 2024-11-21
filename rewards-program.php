@@ -1,12 +1,12 @@
 <?php
 
 /**
- * Plugin Name: Rewards Program
+ * Plugin Name: Rewards Program CSV Downloader
  * Plugin URI: https://jilllynndesign.com/
- * Description: Custom Funcationality for the Rewards Program
- * Version: 0.5
+ * Description: Downloads teh CVS sent to a sepcific email, and extracts the customer data, then saves it into the database
+ * Version: 0.7
  * Author: Andor Nagy
- * Author URI: https://andornagy.com/
+ * Author URI: https://jilllynndesign.com/
  */
 
 
@@ -24,3 +24,5 @@ use RewardsProgram\PluginSettings;
 if (is_admin()) {
     new PluginSettings();
 }
+
+add_action('rewards_program_daily_cron', ['RewardsProgram\PluginSettings', 'check_and_download_csv']);

@@ -1,8 +1,12 @@
 <div class="wrap">
     <h1>Rewards Program CSV Downloader</h1>
 
-    <?php if (get_option('gmail_access_token')): ?>
-        <p>You are authenticated with Gmail.</p>
+    <?php if (get_option('gmail_access_token')):
+
+        $loggedInEmail = get_option('gmail_logged_in_email');
+
+    ?>
+        <p>You are authenticated with Gmail as: <strong> <?= $loggedInEmail ?? 'unknown' ?></strong></p>
         <p><strong>Last Check:</strong> <?php echo esc_html(get_option('gmail_last_check')); ?></p>
         <p><strong>Last File Downloaded:</strong> <?php echo esc_html(get_option('gmail_last_file')); ?></p>
 

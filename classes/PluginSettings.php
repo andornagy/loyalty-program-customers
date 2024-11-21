@@ -9,8 +9,10 @@ class PluginSettings
         add_action('admin_menu', [$this, 'register_settings_page']);
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_post_gmail_authenticate', [$this, 'authenticate_gmail']);
-        add_action('admin_post_gmail_check_email', [$this, 'check_and_download_csv']);
-        add_action('init', [$this, 'register_custom_post_type']);
+        add_action('admin_post_gmail_check_email', [$this, 'check_and_download_csv_manually']);
+        add_action('rewards_program_daily_cron', ['RewardsProgram\PluginSettings', 'check_and_download_csv_cron']);
+        // add_action('init', [$this, 'register_custom_post_type']);
+        register_deactivation_hook(__FILE__, [$this, 'deactivate_plugin']);
     }
 
     /**
@@ -85,7 +87,7 @@ class PluginSettings
      *
      * @return void
      */
-    public function check_and_download_csv()
+    public function check_and_download_csv_manually()
     {
         $gmailHandler = new GmailHandler();
         $gmailHandler->check_for_csv();
@@ -93,26 +95,27 @@ class PluginSettings
         exit;
     }
 
-    /**
-     * Registers a custom post type for customers.
-     *
-     * This method registers a custom post type named "customer" with a few basic
-     * settings. It makes the post type publicly accessible, allows it to be
-     * queried by url, and enables the title field in the WordPress editor.
-     *
-     * @return void
-     */
-    public function register_custom_post_type()
+    public static function check_and_download_csv_cron()
     {
-        register_post_type('customer', [
-            'labels' => [
-                'name' => __('Customers'),
-                'singular_name' => __('Customer'),
-            ],
-            'public' => true,
-            'has_archive' => true,
-            'supports' => ['title'],
-            'show_in_rest' => true,
-        ]);
+        $gmailHandler = new GmailHandler();
+        if ($gmailHandler->check_for_csv()) {
+            error_log('Daily Gmail check and CSV download completed.');
+        }
+    }
+
+
+    public function schedule_cron_job()
+    {
+        if (!wp_next_scheduled('rewards_program_daily_cron')) {
+            wp_schedule_event(time(), 'daily', 'rewards_program_daily_cron');
+        }
+    }
+
+    public function deactivate_plugin()
+    {
+        $timestamp = wp_next_scheduled('rewards_program_daily_cron');
+        if ($timestamp) {
+            wp_unschedule_event($timestamp, 'rewards_program_daily_cron');
+        }
     }
 }
