@@ -24,5 +24,3 @@ use RewardsProgram\PluginSettings;
 if (is_admin()) {
     new PluginSettings();
 }
-
-add_action('rewards_program_daily_cron', ['RewardsProgram\PluginSettings', 'check_and_download_csv']);

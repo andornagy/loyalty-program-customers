@@ -10,7 +10,7 @@ class PluginSettings
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_post_gmail_authenticate', [$this, 'authenticate_gmail']);
         add_action('admin_post_gmail_check_email', [$this, 'check_and_download_csv_manually']);
-        add_action('rewards_program_daily_cron', ['RewardsProgram\PluginSettings', 'check_and_download_csv_cron']);
+        add_action('rewards_program_daily_cron', [$this, 'check_and_download_csv_cron']);
         // add_action('init', [$this, 'register_custom_post_type']);
         register_deactivation_hook(__FILE__, [$this, 'deactivate_plugin']);
     }
