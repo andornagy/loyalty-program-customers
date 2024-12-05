@@ -11,8 +11,10 @@ class PluginSettings
         add_action('admin_post_gmail_authenticate', [$this, 'authenticate_gmail']);
         add_action('admin_post_gmail_check_email', [$this, 'check_and_download_csv_manually']);
         add_action('rewards_program_daily_cron', [$this, 'check_and_download_csv_cron']);
-        // add_action('init', [$this, 'register_custom_post_type']);
-        register_deactivation_hook(__FILE__, [$this, 'deactivate_plugin']);
+        register_deactivation_hook(plugin_basename(__FILE__), [$this, 'deactivate_plugin']);
+
+        // Schedule cron job on plugin initialization
+        add_action('init', [$this, 'schedule_cron_job']);
     }
 
     /**
@@ -95,19 +97,27 @@ class PluginSettings
         exit;
     }
 
-    public static function check_and_download_csv_cron()
+    public function check_and_download_csv_cron()
     {
+        error_log('Cron job is running.');
         $gmailHandler = new GmailHandler();
         if ($gmailHandler->check_for_csv()) {
             error_log('Daily Gmail check and CSV download completed.');
+        } else {
+            error_log('No CSV files found or an error occurred.');
         }
     }
 
 
     public function schedule_cron_job()
     {
+        error_log('schedule_cron_job triggered.');
+
         if (!wp_next_scheduled('rewards_program_daily_cron')) {
             wp_schedule_event(time(), 'daily', 'rewards_program_daily_cron');
+            error_log('Cron job rewards_program_daily_cron has been scheduled.');
+        } else {
+            error_log('Cron job rewards_program_daily_cron is already scheduled.');
         }
     }
 

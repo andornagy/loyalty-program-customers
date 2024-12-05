@@ -153,6 +153,9 @@ class GmailHandler
      */
     public function check_for_csv()
     {
+
+        update_option('gmail_last_check', current_time('mysql'));
+
         $user = 'me';
 
         // Fetch the ID of the last processed email from the database
@@ -166,7 +169,7 @@ class GmailHandler
         $messages = $this->service->users_messages->listUsersMessages($user, $optParams);
 
         if (empty($messages->getMessages())) {
-            echo "No new emails with attachments found.";
+            error_log("No new emails with attachments found.");
             return;
         }
 
@@ -176,7 +179,7 @@ class GmailHandler
 
         // If this email has already been processed, skip it
         if ($messageId === $lastProcessedId) {
-            echo "No new emails to process.";
+            error_log("No new emails to process.");;
             return;
         }
 
@@ -203,7 +206,6 @@ class GmailHandler
                 $csvProcessor->process_csv();
 
                 // Update last processed message ID
-                update_option('gmail_last_check', current_time('mysql'));
                 update_option('gmail_last_file', $part->getFilename());
                 update_option('gmail_last_processed_id', $messageId);
 
