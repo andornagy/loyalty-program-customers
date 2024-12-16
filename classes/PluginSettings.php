@@ -10,7 +10,6 @@ class PluginSettings
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_post_gmail_authenticate', [$this, 'authenticate_gmail']);
         add_action('admin_post_gmail_check_email', [$this, 'check_and_download_csv_manually']);
-        add_action('rewards_program_daily_cron', [$this, 'check_and_download_csv_cron']);
         register_deactivation_hook(plugin_basename(__FILE__), [$this, 'deactivate_plugin']);
 
         // Schedule cron job on plugin initialization
@@ -100,6 +99,7 @@ class PluginSettings
     public function check_and_download_csv_cron()
     {
         error_log('Cron job is running.');
+        update_option('gmail_last_check', current_time('mysql'));
         $gmailHandler = new GmailHandler();
         if ($gmailHandler->check_for_csv()) {
             error_log('Daily Gmail check and CSV download completed.');

@@ -24,3 +24,12 @@ use RewardsProgram\PluginSettings;
 if (is_admin()) {
     new PluginSettings();
 }
+
+
+function call_plugin_settings_method()
+{
+    $plugin_settings = new PluginSettings();
+    $plugin_settings->check_and_download_csv_cron(); // Replace with the actual method.
+}
+
+add_action('rewards_program_daily_cron', 'call_plugin_settings_method');
