@@ -4,7 +4,7 @@
  * Plugin Name: Rewards Program CSV Downloader
  * Plugin URI: https://jilllynndesign.com/
  * Description: Downloads teh CVS sent to a sepcific email, and extracts the customer data, then saves it into the database
- * Version: 0.7
+ * Version: 1.0.0
  * Author: Andor Nagy
  * Author URI: https://jilllynndesign.com/
  */
