@@ -29,20 +29,20 @@ class GmailHandler
         $decodedToken = $accessToken ? json_decode($accessToken, true) : null;
 
         // Log access token retrieval
-        error_log("Access token retrieved: " . print_r($decodedToken, true));
+        log_stripe_test("Access token retrieved: " . print_r($decodedToken, true));
 
         // Check if we have a valid access token
         if ($decodedToken && isset($decodedToken['access_token'])) {
             $this->client->setAccessToken($decodedToken);
         } else {
-            error_log("No valid access token found. Redirecting to authenticate.");
+            log_stripe_test("No valid access token found. Redirecting to authenticate.");
             $this->request_new_token();
             return; // Prevent further execution if no token is available
         }
 
         // Check if the token is expired
         if ($this->client->isAccessTokenExpired()) {
-            error_log("Access token expired, attempting to refresh.");
+            log_stripe_test("Access token expired, attempting to refresh.");
 
             $refreshToken = $this->client->getRefreshToken();
             if ($refreshToken) {
@@ -51,14 +51,14 @@ class GmailHandler
                 if (!isset($newToken['error'])) {
                     // Update the access token
                     update_option('gmail_access_token', json_encode(array_merge($decodedToken, $newToken)));
-                    error_log("Access token refreshed successfully.");
+                    log_stripe_test("Access token refreshed successfully.");
                 } else {
-                    error_log("Error refreshing token, re-authentication required: " . $newToken['error']);
+                    log_stripe_test("Error refreshing token, re-authentication required: " . $newToken['error']);
                     $this->request_new_token();
                     return;
                 }
             } else {
-                error_log("Refresh token missing, re-authentication required.");
+                log_stripe_test("Refresh token missing, re-authentication required.");
                 $this->request_new_token();
                 return;
             }
@@ -83,7 +83,7 @@ class GmailHandler
 
             // Handle token errors
             if (isset($token['error'])) {
-                error_log("Error in authentication token: " . $token['error']);
+                log_stripe_test("Error in authentication token: " . $token['error']);
                 wp_die("Error fetching access token: " . esc_html($token['error']));
             }
 
@@ -92,7 +92,7 @@ class GmailHandler
             if (isset($token['refresh_token'])) {
                 // Save the new refresh token
                 $existingToken['refresh_token'] = $token['refresh_token'];
-                error_log("New refresh token received and saved.");
+                log_stripe_test("New refresh token received and saved.");
             }
 
             // Save the merged token data to include refresh token if missing
@@ -102,10 +102,10 @@ class GmailHandler
             $email = $gmailHandler->get_user_email();
 
             if ($email) {
-                error_log("Logged-in user email: $email");
+                log_stripe_test("Logged-in user email: $email");
                 update_option('gmail_logged_in_email', $email);
             } else {
-                error_log("Unable to retrieve the user's email address.");
+                log_stripe_test("Unable to retrieve the user's email address.");
             }
 
             wp_redirect(admin_url('options-general.php?page=rewards-program'));
@@ -117,7 +117,7 @@ class GmailHandler
     {
         // Set a transient to limit redirects to one time per 5 minutes
         if (get_transient('gmail_auth_redirect')) {
-            error_log("Redirect already attempted recently, preventing loop.");
+            log_stripe_test("Redirect already attempted recently, preventing loop.");
             return;
         }
 
@@ -125,7 +125,7 @@ class GmailHandler
         set_transient('gmail_auth_redirect', true, 300); // 5 minutes
 
         $authUrl = $this->client->createAuthUrl();
-        error_log("Redirecting to Google authentication URL: $authUrl");
+        log_stripe_test("Redirecting to Google authentication URL: $authUrl");
         wp_redirect($authUrl);
         exit();
     }
@@ -153,7 +153,6 @@ class GmailHandler
      */
     public function check_for_csv()
     {
-
         update_option('gmail_last_check', current_time('mysql'));
 
         $user = 'me';
@@ -169,7 +168,7 @@ class GmailHandler
         $messages = $this->service->users_messages->listUsersMessages($user, $optParams);
 
         if (empty($messages->getMessages())) {
-            error_log("No new emails with attachments found.");
+            log_stripe_test("No new emails with attachments found.");
             return;
         }
 
@@ -179,7 +178,7 @@ class GmailHandler
 
         // If this email has already been processed, skip it
         if ($messageId === $lastProcessedId) {
-            error_log("No new emails to process.");;
+            log_stripe_test("No new emails to process.");
             return;
         }
 
@@ -194,22 +193,32 @@ class GmailHandler
                 $attachment = $this->service->users_messages_attachments->get($user, $messageId, $attachmentId);
                 $data = base64_decode(strtr($attachment->getData(), '-_', '+/'));
 
-                // Save the file with its original name
-                $filePath = plugin_dir_path(__FILE__) . '../downloads/' . $part->getFilename();
+                // Ensure the download folder exists
+                $downloadDir = WP_CONTENT_DIR . '/gmail-to-csv/';
+                if (!file_exists($downloadDir)) {
+                    wp_mkdir_p($downloadDir);
+                }
+
+                // Generate a unique filename
+                $timestamp = time();
+                $uniqueFilename = pathinfo($part->getFilename(), PATHINFO_FILENAME) . "_{$timestamp}." . pathinfo($part->getFilename(), PATHINFO_EXTENSION);
+                $filePath = $downloadDir . $uniqueFilename;
+
+                // Save the file with its unique name
                 file_put_contents($filePath, $data);
 
                 // Limit storage to the 5 most recent files
-                $this->limit_downloads_to_recent(5);
+                $this->limit_downloads_to_recent(5, $downloadDir);
 
                 // Process the downloaded CSV
                 $csvProcessor = new CSVProcessor($filePath);
                 $csvProcessor->process_csv();
 
-                // Update last processed message ID
-                update_option('gmail_last_file', $part->getFilename());
+                // Update last processed message ID and filename
+                update_option('gmail_last_file', $uniqueFilename);
                 update_option('gmail_last_processed_id', $messageId);
 
-                echo "Downloaded and processed CSV attachment: {$part->getFilename()}";
+                echo "Downloaded and processed CSV attachment: {$uniqueFilename}";
                 return; // Stop after processing the first CSV attachment
             }
         }
@@ -218,7 +227,7 @@ class GmailHandler
     // Function to limit the number of saved CSV files to the most recent 5
     private function limit_downloads_to_recent($maxFiles)
     {
-        $downloadDir = plugin_dir_path(__FILE__) . '../downloads/';
+        $downloadDir = WP_CONTENT_DIR . '/gmail-to-csv/';
         $files = glob($downloadDir . '*.csv');
 
         // Sort files by modified time, descending

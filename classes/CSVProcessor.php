@@ -63,6 +63,7 @@ class CSVProcessor
             wp_delete_post($post_id, true);
             clean_post_cache($post_id);
             $this->deletedCount++;
+            log_stripe_test("Deleted customer: " . print_r($post_id, true));
         }
 
         // Store counts in options for reporting on the settings page
@@ -96,13 +97,13 @@ class CSVProcessor
 
                     // Check if the first column (customer_number) is numeric
                     if (!is_numeric($row[0])) {
-                        error_log("Skipping row with non-numeric customer_number: " . print_r($row, true));
+                        log_stripe_test("Skipping row with non-numeric customer_number: " . print_r($row, true));
                         continue;
                     }
 
                     $data[] = array_combine($expectedKeys, $row);
                 } else {
-                    error_log("CSV row does not match expected format: " . print_r($row, true));
+                    log_stripe_test("CSV row does not match expected format: " . print_r($row, true));
                 }
             }
             fclose($handle);
@@ -124,7 +125,7 @@ class CSVProcessor
     {
         $existingCustomers = [];
         $query = new \WP_Query([
-            'post_type' => 'customers',
+            'post_type' => 'customer',
             'posts_per_page' => -1,
             'fields' => 'ids',
             'meta_query' => [
@@ -157,7 +158,7 @@ class CSVProcessor
     {
         $postId = wp_insert_post([
             'post_title' => $data['name'],
-            'post_type' => 'customers',
+            'post_type' => 'customer',
             'post_status' => 'publish'
         ]);
 
@@ -167,6 +168,7 @@ class CSVProcessor
             update_post_meta($postId, 'state', $data['state']);
             update_post_meta($postId, 'points', $data['points']);
             $this->addedCount++;
+            log_stripe_test("Added customer: " . print_r($postId . ": " . $data, true));
         }
     }
 
@@ -191,36 +193,57 @@ class CSVProcessor
 
         $isUpdated = false;
 
+        // Normalize values for comparison
+        $data['city'] = isset($data['city']) ? (string)$data['city'] : '';
+        $data['state'] = isset($data['state']) ? (string)$data['state'] : '';
+        $data['points'] = isset($data['points']) ? (string)$data['points'] : '';
+
         // Check if post title needs updating
-        if ($current_post->post_title !== $data['name']) {
+        if (!empty($data['name']) && trim($current_post->post_title) !== trim($data['name'])) {
             wp_update_post([
                 'ID' => $postId,
                 'post_title' => $data['name']
             ]);
             $isUpdated = true;
+            log_stripe_test("Updated post title for customer: {$postId}");
         }
 
         // Check if city meta needs updating
-        if (isset($current_meta['city'][0]) && $current_meta['city'][0] !== $data['city']) {
+        if (
+            isset($current_meta['city'][0]) &&
+            $current_meta['city'][0] !== $data['city']
+        ) {
             update_post_meta($postId, 'city', $data['city']);
             $isUpdated = true;
+            log_stripe_test("Updated city for customer: {$postId}");
         }
 
         // Check if state meta needs updating
-        if (isset($current_meta['state'][0]) && $current_meta['state'][0] !== $data['state']) {
+        if (
+            isset($current_meta['state'][0]) &&
+            $current_meta['state'][0] !== $data['state']
+        ) {
             update_post_meta($postId, 'state', $data['state']);
             $isUpdated = true;
+            log_stripe_test("Updated state for customer: {$postId}");
         }
 
         // Check if points meta needs updating
-        if (isset($current_meta['points'][0]) && $current_meta['points'][0] !== $data['points']) {
+        if (
+            isset($current_meta['points'][0]) &&
+            $current_meta['points'][0] !== $data['points']
+        ) {
             update_post_meta($postId, 'points', $data['points']);
             $isUpdated = true;
+            log_stripe_test("Updated points for customer: {$postId}");
         }
 
         // If any meta was updated, update the counter
         if ($isUpdated) {
             $this->updatedCount++;
+            log_stripe_test("Customer updated: {$postId}, updated count: {$this->updatedCount}");
+        } else {
+            log_stripe_test("No updates needed for customer: {$postId}");
         }
     }
 }
